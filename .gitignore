@@ -1,0 +1,31 @@
+# Elixir / BEAM
+/_build/
+/deps/
+/*.ez
+erl_crash.dump
+/priv/native/
+*.beam
+
+# Rust / Rustler
+/native/*/target/
+/native/*/Cargo.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv/
+env/
+venv/
+
+# Raft / ra data (Storage for local nodes)
+/nonode@nohost/
+/Node_*/
+
+# OS / IDE
+.DS_Store
+.elixir_ls/
+.vscode/
+.idea/
+Thumbs.db

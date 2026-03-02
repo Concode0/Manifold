@@ -42,9 +42,6 @@ async def run_client(target_port, listen_port):
     print(f"\033[36m[Client]\033[0m Listening for results on port {listen_port}...")
 
     # --- TASK: THE MIGRATING COLLATZ ---
-    # This task calculates the stopping time for Collatz sequences in a distributed range.
-    # The 'parallel_for' subtype will cause the Manifold nodes to split (mitosis) the range
-    # and migrate shards to other nodes based on load and feature geometry.
     
     collatz_program = [
         # Setup: Stack has [Start, End] pushed by VM context injection
@@ -65,16 +62,6 @@ async def run_client(target_port, listen_port):
         
         # --- Collatz Inner Loop (Label 6) ---
         ['SWAP'],              # Stack: [i, Steps, n=i] (simulated swap, actually need rotate)
-        # VM doesn't have SWAP/ROT yet? Let's implement Collatz for just 'n' and print (n, steps)
-        # Simplified: We just process ONE number 'Start' for now per shard?
-        # No, let's implement the loop properly.
-        # Since VM is simple, let's make the shard granularity small (1 item per shard) or 
-        # just compute for the 'Start' value to keep assembly simple for this PoC.
-        
-        # NEW PLAN: Simple VM Assembly is hard. 
-        # Let's just compute Collatz for the 'Start' value of the shard.
-        # If shard size is 1, we get full coverage.
-        
         ['POP'],               # Clean stack
         ['LOAD', 0],           # Stack: [n=Start]
         ['DUP'],               # Stack: [n, original_n]
@@ -88,10 +75,6 @@ async def run_client(target_port, listen_port):
         # Check if n == 1
         ['ROT3'],              # Stack: [steps, n, original_n] -> Wait, VM needs ROT3
     ]
-    
-    # RE-WRITING ASSEMBLY FOR SIMPLE STACK MACHINE WITHOUT ROT/SWAP
-    # We will compute Collatz for the number at Memory[0] (The Start of the range)
-    # And return (Number, Steps)
     
     collatz_program_simple = [
         # Init: Mem[2] = CurrentN, Mem[3] = Steps

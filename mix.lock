@@ -1,0 +1,11 @@
+%{
+  "aten": {:hex, :aten, "0.6.0", "7a57b275a6daf515ac3683fb9853e280b4d0dcdd74292fd66ac4a01c8694f8c7", [:rebar3], [], "hexpm", "5f39a164206ae3f211ef5880b1f7819415686436e3229d30b6a058564fbaa168"},
+  "complex": {:hex, :complex, "0.6.0", "b0130086a7a8c33574d293b2e0e250f4685580418eac52a5658a4bd148f3ccf1", [:mix], [], "hexpm", "0a5fa95580dcaf30fcd60fe1aaf24327c0fe401e98c24d892e172e79498269f9"},
+  "gen_batch_server": {:hex, :gen_batch_server, "0.8.9", "1c6bc0f530bf8c17e8b4acc20c2cc369ffa5bee2b46de01e21410745f24b1bc9", [:rebar3], [], "hexpm", "c8581fe4a4b6bccf91e53ce6a8c7e6c27c8c591bab5408b160166463f5579c22"},
+  "jason": {:hex, :jason, "1.4.4", "b9226785a9aa77b6857ca22832cffa5d5011a667207eb2a0ad56adb5db443b8a", [:mix], [{:decimal, "~> 1.0 or ~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "c5eb0cab91f094599f94d55bc63409236a8ec69a21a67814529e8d5f6cc90b3b"},
+  "nx": {:hex, :nx, "0.11.0", "d37723dbd6cfa274a5def6d6664f5680c32e2eb8a1ce25ec6d91751967fa0abf", [:mix], [{:complex, "~> 0.6", [hex: :complex, repo: "hexpm", optional: false]}, {:telemetry, "~> 0.4.0 or ~> 1.0", [hex: :telemetry, repo: "hexpm", optional: false]}], "hexpm", "36157b21239aeb251d6cbac23eb0eb3495a5e1e0cbc2e6df16afd2ede1575205"},
+  "ra": {:hex, :ra, "2.17.2", "86c17fc3072ca3516a46316b9ecd4e887da06c0d52d79d84281bcf20476ec6cd", [:rebar3], [{:aten, "0.6.0", [hex: :aten, repo: "hexpm", optional: false]}, {:gen_batch_server, "0.8.9", [hex: :gen_batch_server, repo: "hexpm", optional: false]}, {:seshat, "1.0.1", [hex: :seshat, repo: "hexpm", optional: false]}], "hexpm", "5c6019d8aeb7f6850360f94ff4dc3a96dfbfa7c3fbffd2df29392f258950856c"},
+  "rustler": {:hex, :rustler, "0.37.3", "5f4e6634d43b26f0a69834dd1d3ed4e1710b022a053bf4a670220c9540c92602", [:mix], [{:jason, "~> 1.0", [hex: :jason, repo: "hexpm", optional: false]}], "hexpm", "a6872c6f53dcf00486d1e7f9e046e20e01bf1654bdacc4193016c2e8002b32a2"},
+  "seshat": {:hex, :seshat, "1.0.1", "fa7a8e89218d19394f7ddc47ba6725471103d654cd0bd0a98e5fdd922a943eac", [:rebar3], [], "hexpm", "38324fe8c5782c69d73b334dd00b20e16c0d99eef3e7b4005c519fe9bc0e34fc"},
+  "telemetry": {:hex, :telemetry, "1.3.0", "fedebbae410d715cf8e7062c96a1ef32ec22e764197f70cda73d82778d61e7a2", [:rebar3], [], "hexpm", "7015fc8919dbe63764f4b4b87a95b7c0996bd539e0d499be6ec9d7f3875b79e6"},
+}

@@ -1,0 +1,13 @@
+# Handle line endings automatically
+* text=auto
+
+# Syntax highlighting / Linguist
+*.ex linguist-language=Elixir
+*.exs linguist-language=Elixir
+*.rs linguist-language=Rust
+
+# Binary files
+assets/*.gif binary
+assets/*.png binary
+assets/*.jpg binary
+assets/*.jpeg binary
