@@ -19,7 +19,7 @@ In modern distributed systems, "heterogeneity" is the norm. Nodes vary in CPU po
 
 ## 🏗 System Architecture
 
-Manifold is built on three pillars: **Geode** (Routing), **Entangle** (VM), and **Nexus** (Consensus).
+Manifold is built on three pillars: **Geode** (Routing), **Virtual Machine** (VM), and **Nexus** (Consensus).
 
 ### 1. Geode: Geometric Routing & Discovery
 
@@ -33,8 +33,8 @@ Manifold is built on three pillars: **Geode** (Routing), **Entangle** (VM), and 
 *   **Load Distortion:** The metric is dynamically distorted by the node's current load. A "close" (perfect match) node becomes "far" if it is overloaded, naturally repelling traffic.
 *   **Small World Topology:** Nodes self-organize using a Kleinberg-inspired model, maintaining a mix of local ( geometrically similar) and long-range (random shortcut) connections to ensure efficient routing across the cluster.
 
-### 2. Entangle: The Distributed Virtual Machine
-Manifold runs a custom stack-based VM ("Entangle") designed for distributed execution.
+### 2. The Distributed Virtual Machine
+Manifold runs a custom stack-based VM designed for distributed execution.
 *   **Micro-Kernels:** Tasks are small assembly programs.
 *   **Distributed Shared Memory (DSM):** The VM supports instructions like `LOAD_GLOBAL` and `STORE_GLOBAL` which transparently access a cluster-wide key-value store.
 *   **Task Mitosis:** The `parallel_for` task subtype allows the system to automatically break a loop into shards and dispatch them to the top-k geometrically closest neighbors.
@@ -89,7 +89,7 @@ python client.py
 ## 🧠 Code Structure
 
 *   `node.py`: The core OS kernel. Handles networking, gossip, routing, and task management.
-*   `vm.py`: The "Entangle" Virtual Machine implementation.
+*   `vm.py`: The Virtual Machine implementation.
 *   `launcher.py`: Orchestration tool to spawn the cluster.
 *   `client.py`: User-space CLI for submitting jobs.
 *   `config.py`: Centralized configuration.

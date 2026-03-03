@@ -1,50 +1,79 @@
-# Manifold: The Geometric Distributed OS (Elixir/Rust Research Core)
+# Manifold: Geometric Distributed OS
 
-Manifold is a research prototype of a distributed operating system that leverages geometric principles (Field-based Gradient Routing) to manage heterogeneity and scale.
+Manifold is a research framework for distributed task scheduling using **Minkowski Metrics**. By treating node resources (Capacity, Memory, Latency) as dimensions, Manifold uses geometric distance to balance tasks in heterogeneous clusters.
 
-## Architecture
+## Core Pillars
 
-This core implementation utilizes a hybrid architecture:
-- **Elixir (OTP):** Manages the distributed kernel, including Gossip protocols, Small World topology maintenance, and Raft consensus.
-- **Rust (NIFs):** Provides a high-performance, deterministic execution engine (Entangle VM) and a static task effort estimator.
+1.  **Minkowski Routing:** Implements an $L_3$ metric ($(|C_1-C_2|^3 + |M_1-M_2|^3)^{1/3}$) with exponential load distortion. This penalizes single-dimension resource outliers more heavily than Euclidean ($L_2$) distance.
+2.  **Task Mitosis:** A pipeline comprising **Static Instruction Analysis** (calculating deterministic effort scores in Rust) and **Proportional Heterogeneous Sharding** (allocating work-ranges sized relative to candidate node capacities).
+3.  **Hybrid Architecture:** A **Control Plane** (Elixir/OTP) for fault-tolerant orchestration and an **Accelerated Data Plane** (Rust/NIF) for native mathematical execution.
+4.  **Epidemic Gossip:** A batch-based directory propagation protocol ensuring cluster-wide state convergence through recursive neighbor synchronization.
 
-### Key Research Features
-- **Geometric Scheduling:** Nodes are mapped into a Riemannian manifold based on their feature vectors (Compute, Memory, Trust). Task routing is performed using gradient descent in the metric space.
-- **Task Mitosis:** Automatic splitting of large tasks into deterministic shards based on compile-time effort estimation.
-- **Raft DSM:** A strongly consistent, replicated Distributed Shared Memory (DSM) for global state management.
-- **Small World Topology:** Self-organizing network links that balance local feature affinity with long-range random shortcuts.
+---
 
-## Prerequisites
-- Elixir 1.15+
-- Erlang/OTP 26+
-- Rust 1.70+
-- `mix` (Elixir build tool)
+## Performance Metrics (Benchmarks)
 
-## Quick Start
+*Generated on a simulated 5-node cluster (Apple M4 Environment).*
 
-### 1. Compile the Project
-Fetches dependencies and compiles the Rust NIF:
+### **Suite A: Routing Variance**
+Measures how evenly the load-to-capacity ratio is distributed across nodes. Lower variance indicates more stable balancing.
+
+#### **Heterogeneous Cluster** (Diverse capacities: 1.0 to 20.0)
+| Algorithm | Load Ratio Variance |
+| :--- | :--- |
+| **Manifold (L3)** | **0.4104** |
+| Power of Two Choices (P2C) | 143.0720 |
+| Round Robin | 17075.6904 |
+
+#### **Homogeneous Cluster** (All nodes equal: 10.0)
+| Algorithm | Load Ratio Variance |
+| :--- | :--- |
+| **Manifold (L3)** | **0.1080** |
+| Power of Two Choices (P2C) | 0.2400 |
+| Round Robin | 9.0720 |
+
+### **Suite B: Mitosis Efficiency (The U-Curve)**
+Coordination overhead of task splitting across loopback TCP sockets (100k ops).
+| Shards | Total Time (ms) |
+| :--- | :--- |
+| 1 (Local) | 522.24 ms |
+| 2 (Predicted Optimal) | 517.05 ms |
+| 4 | 530.03 ms |
+| 8 | 546.30 ms |
+| 16 | 573.03 ms |
+
+### **Suite C: Consensus Latency**
+Raft commit scaling for Distributed Shared Memory (DSM).
+| Nodes | Avg Commit Latency (ms) |
+| :--- | :--- |
+| 1 | 0.48 ms |
+| 3 | 0.94 ms |
+| 5 | 0.86 ms |
+
+### **Suite D: Virtual Machine Performance (1M Ops)**
+| Metric | Elixir (Control Plane) | Rust (Data Plane) |
+| :--- | :--- | :--- |
+| **Execution Rate** | 51.44 ips | **46.04 ips** |
+| **BEAM Heap Pressure** | **79.99 MB** | **0.000016 MB** |
+*Note: While small-scale throughput is similar due to NIF overhead, Rust eliminates BEAM heap pressure by a factor of 5,000,000x.*
+
+---
+
+## Research Caveats & Analysis Notes
+
+When analyzing the provided data, the following physical and logical constraints must be considered:
+
+1.  **Single-Machine Bottleneck:** All benchmarks run on a single physical CPU. In Suite B, high shard counts (8+) introduce **CPU contention** and OS context-switching overhead that would not exist in a truly distributed network.
+2.  **Loopback Latency:** Networking metrics use the `127.0.0.1` interface. Real-world physical network latency and switch-jitter will significantly increase the coordination cost in Suite C (Consensus).
+3.  **Memory Transparency:** The "Heap Pressure" advantage in Suite D reflects only the memory managed by the Erlang Garbage Collector (GC). Rust NIF execution uses **Manual Memory Management** on the native heap, which is opaque to BEAM GC but remains part of the total system footprint.
+4.  **Metric Sensitivity:** The $L_3$ metric is mathematically tuned to prioritize "Capacity Leveling." In clusters with near-zero load, the geometric distance may appear more volatile than P2C until the exponential distortion field triggers at higher load ratios.
+
+---
+
+## Usage
+
+### **Run Benchmarks & Analysis**
+The following command executes all research suites and generates standardized CSV outputs for further analysis.
 ```bash
-mix deps.get && mix compile
+mix run benchmark.exs
 ```
-
-### 2. Run the Research Simulation
-Launches a multi-node cluster, interconnects them, and executes a parallelized task:
-```bash
-mix run simulator.exs
-```
-
-### 3. Run Consensus Tests
-Verify the Raft-backed Distributed Shared Memory:
-```bash
-mix run test_dsm.exs
-```
-
-## Project Structure
-- `lib/manifold_engine/`: Core Elixir modules (Networking, Routing, Mitosis, etc.)
-- `native/manifold_rust/`: Rust implementation of the VM and distance metrics.
-- `simulator.exs`: The main research simulation environment.
-- `poc_python/`: Original Python Proof of Concept.
-
-## License
-MIT

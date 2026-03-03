@@ -1,49 +1,43 @@
 defmodule ManifoldEngine.DSM do
   @moduledoc """
-  Distributed Shared Memory built on the Raft consensus protocol.
+  The Distributed Shared Memory (DSM) interface.
+  
+  Provides an atomic, consistent key-value store across the cluster 
+  using the Raft consensus protocol.
   """
 
   @cluster_name :manifold_dsm
 
-  @doc """
-  Starts the local Raft server for this node.
-  `node_id` is a unique identifier (e.g., node port or atom).
-  `members` is a list of `{id, node}` tuples for the initial cluster.
-  """
+  @doc "Starts a Raft cluster for the DSM with the given member nodes."
   def start_server(_node_id, members) do
     machine = {:module, ManifoldEngine.DSM.Machine, %{}}
     :ra.start_cluster(:default, @cluster_name, machine, members)
   end
 
-  @doc """
-  Stores a value globally.
-  """
+  @doc "Atomically puts a value into the global DSM."
   def put(server_id, key, value) do
     case :ra.process_command(server_id, {:put, key, value}) do
-      {:ok, _result, _leader} -> :ok
+      {:ok, :ok, _leader} -> :ok
+      {:ok, reply, _leader} -> reply
       error -> error
     end
   end
 
-  @doc """
-  Loads a value globally.
-  """
+  @doc "Retrieves a value from the global DSM."
   def get(server_id, key) do
-    # Note: process_command goes through Raft consensus. 
-    # For local reads (potentially stale), :ra.local_query could be used.
     case :ra.process_command(server_id, {:get, key}) do
       {:ok, result, _leader} -> {:ok, result}
       error -> error
     end
   end
 
-  @doc """
-  Atomic Compare-and-Swap.
-  """
+  @doc "Performs an atomic Compare-And-Swap (CAS) operation."
   def cas(server_id, key, old_val, new_val) do
+    # Raft ensures that CAS is linearizable across the cluster.
     case :ra.process_command(server_id, {:cas, key, old_val, new_val}) do
-      {:ok, {:ok, _val}, _leader} -> :ok
+      {:ok, {:ok, val}, _leader} -> {:ok, val}
       {:ok, {:error, reason}, _leader} -> {:error, reason}
+      {:ok, reply, _leader} -> reply
       error -> error
     end
   end

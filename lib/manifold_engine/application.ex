@@ -1,5 +1,5 @@
 defmodule ManifoldEngine.Application do
-  @moduledoc "Supervision tree for the Geometric Distributed OS."
+  
   use Application
 
   @impl true
@@ -13,15 +13,15 @@ defmodule ManifoldEngine.Application do
     Supervisor.start_link(children, opts)
   end
 
-  def start_node(port) do
-    children = [
-      {ManifoldEngine.Node, [port: port, capacity: 10.0, memory: 10.0]},
-      {ManifoldEngine.Networking, [port: port]},
-      {ManifoldEngine.Gossip, [interval: 2000, port: port]},
-      {ManifoldEngine.Topology, [interval: 5000, port: port]}
+  def start_node(port, capacity \\ nil, memory \\ nil) do
+    children_specs = [
+      %{id: {ManifoldEngine.Node, port}, start: {ManifoldEngine.Node, :start_link, [[port: port, capacity: capacity, memory: memory]]}},
+      %{id: {ManifoldEngine.Networking, port}, start: {ManifoldEngine.Networking, :start_link, [[port: port]]}},
+      %{id: {ManifoldEngine.Gossip, port}, start: {ManifoldEngine.Gossip, :start_link, [[interval: 2000, port: port]]}},
+      %{id: {ManifoldEngine.Topology, port}, start: {ManifoldEngine.Topology, :start_link, [[interval: 5000, port: port]]}}
     ]
-    Enum.each(children, fn {module, opts} ->
-      Supervisor.start_child(ManifoldEngine.Supervisor, {module, opts})
+    Enum.each(children_specs, fn spec ->
+      Supervisor.start_child(ManifoldEngine.Supervisor, spec)
     end)
   end
 

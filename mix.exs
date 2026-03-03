@@ -25,7 +25,10 @@ defmodule ManifoldEngine.MixProject do
     {:ra, ">= 2.0.0"},
     {:rustler, "~> 0.37.0"},
     {:jason, "~> 1.4"},
-    {:nx, "~> 0.6"}
+    {:nx, "~> 0.6"},
+    {:benchee, "~> 1.3"},
+    {:benchee_html, "~> 1.0"},
+    {:benchee_csv, "~> 1.0"}
     ]
   end
 end

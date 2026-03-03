@@ -11,7 +11,7 @@ enum Instruction {
     Store(u32),
     GetStart,
     GetEnd,
-    Loop(u32, u32), // iterations, body_length
+    Loop(u32, u32), 
 }
 
 #[derive(NifStruct)]
@@ -23,7 +23,7 @@ struct Estimation {
 
 #[rustler::nif]
 fn estimate_task(program: Vec<Instruction>, start: f64, end: f64) -> Estimation {
-    // Estimator: Purely functional complexity analysis before execution.
+    // Static analysis: deterministic effort prediction based on weighted instructions
     let mut total_effort = 0.0;
     let range = (end - start).abs();
 
@@ -49,8 +49,11 @@ fn estimate_task(program: Vec<Instruction>, start: f64, end: f64) -> Estimation 
 
     if range > 0.0 { total_effort *= range; }
 
-    let recommended_shards = if total_effort > 1000.0 {
-        (total_effort / 500.0).ceil() as u32
+    // Shard prediction: heuristic for optimal parallelization
+    let recommended_shards = if total_effort > 5000.0 {
+        (total_effort.log10() * 4.0).round() as u32
+    } else if total_effort > 1000.0 {
+        2
     } else {
         1
     };
@@ -59,6 +62,7 @@ fn estimate_task(program: Vec<Instruction>, start: f64, end: f64) -> Estimation 
 }
 
 fn instruction_cost(instr: &Instruction) -> f64 {
+    // Instruction weighting: offload high-cost math to native execution
     match instr {
         Instruction::Push(_) => 1.0,
         Instruction::Add | Instruction::Sub => 1.0,
@@ -71,7 +75,7 @@ fn instruction_cost(instr: &Instruction) -> f64 {
 
 #[rustler::nif]
 fn execute_task(program: Vec<Instruction>, start: f64, end: f64) -> f64 {
-    // Executor: Deterministic VM with private memory/stack per task shard.
+    // Native data plane: direct mathematical execution bypassing BEAM heap pressure
     let mut stack: Vec<f64> = Vec::new();
     let mut memory: std::collections::HashMap<u32, f64> = std::collections::HashMap::new();
 
@@ -183,11 +187,12 @@ fn geometric_distance(
     trust_index: f64,
     latency: f64,
 ) -> f64 {
-    // Manifold Metric: Minkowski L3 distance distorted by load and trust dilation.
+    // Minkowski L3 metric: penalizes single-dimension outliers more heavily than Euclidean
     let dist: f64 = node_features.iter().zip(task_req.iter())
         .map(|(f, r)| (f - r).abs().powi(3)).sum::<f64>().powf(1.0 / 3.0);
 
     let load_ratio = if capacity > 0.0 { current_load / capacity } else { 1.0 };
+    // Exponential distortion: creates repulsion field as load increases
     let distortion = (2.0 * load_ratio).exp();
     let trust_penalty = 1.0 / (trust_index.max(0.001));
 

@@ -1,5 +1,11 @@
 defmodule ManifoldEngine.Topology do
-  @moduledoc "Manages Small World topology using geometric distance links."
+  @moduledoc """
+  Maintains the Small World network topology of the cluster.
+  
+  Periodically evaluates the geometric distance to all known peers 
+  and updates active links to prioritize local geometric neighbors 
+  while maintaining stochastic long-range shortcuts.
+  """
   use GenServer
   alias ManifoldEngine.{Node, Native}
 
@@ -21,19 +27,29 @@ defmodule ManifoldEngine.Topology do
   def handle_info(:maintenance, %{port: port} = state) do
     node_state = Node.get_state(port)
     peers = Map.values(node_state.peers)
+    n_count = length(peers)
     
-    if length(peers) > 0 do
+    if n_count > 0 do
+      # Small world neighbor count: O(log N) scaling
+      neighbor_count = max(2, round(:math.log(n_count + 1)))
+
+      # Evaluate geometric proximity using Minkowski L3 metric
       sorted_peers = Enum.map(peers, fn peer ->
+        latency = Map.get(peer, :latency, 1.0)
+        current_load = Map.get(peer, :current_load, 0.0)
         dist = Native.geometric_distance(
           [node_state.capacity, node_state.memory],
           [peer.capacity, peer.memory],
-          peer.current_load, peer.capacity, peer.trust_index, 1.0
+          current_load, peer.capacity, peer.trust_index || 1.0, latency
         )
         {peer.id, dist}
       end) |> Enum.sort_by(fn {_, dist} -> dist end)
 
-      k_local = sorted_peers |> Enum.take(2) |> Enum.map(fn {id, _} -> id end)
-      m_long = sorted_peers |> Enum.drop(2) |> Enum.take_random(2) |> Enum.map(fn {id, _} -> id end)
+      # 1. K-local neighbors: the geographically closest nodes
+      k_local = sorted_peers |> Enum.take(neighbor_count) |> Enum.map(fn {id, _} -> id end)
+      
+      # 2. Long-range shortcuts: stochastic links to ensure O(log n) diameter
+      m_long = sorted_peers |> Enum.drop(neighbor_count) |> Enum.take_random(neighbor_count) |> Enum.map(fn {id, _} -> id end)
 
       Node.update_neighbors(port, Enum.uniq(k_local ++ m_long))
     end

@@ -12,20 +12,18 @@ erl_crash.dump
 
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-.env
+*.py
 .venv/
-env/
-venv/
 
-# Raft / ra data (Storage for local nodes)
 /nonode@nohost/
 /Node_*/
 
-# OS / IDE
 .DS_Store
 .elixir_ls/
 .vscode/
 .idea/
 Thumbs.db
+
+*.csv
+
+GEMINI.md
