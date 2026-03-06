@@ -187,8 +187,12 @@ def generate_markdown(results):
         output.append(f"| {label} | {h_stat} | {o_stat} |")
     
     if "Manifold (L3)" in suite_a_hete and "P2C (Sampling)" in suite_a_hete:
-        pv = yuen_welch_test(suite_a_hete["Manifold (L3)"], suite_a_hete["P2C (Sampling)"])
-        output.append(f"\n**Robust P-Value (Yuen-Welch):** p = {pv:.4e}")
+        pv_hete = yuen_welch_test(suite_a_hete["Manifold (L3)"], suite_a_hete["P2C (Sampling)"])
+        output.append(f"\n**Robust P-Value (Heterogeneous):** p = {pv_hete:.4e}")
+
+    if "Manifold (L3)" in suite_a_homo and "P2C (Sampling)" in suite_a_homo:
+        pv_homo = yuen_welch_test(suite_a_homo["Manifold (L3)"], suite_a_homo["P2C (Sampling)"])
+        output.append(f"**Robust P-Value (Homogeneous):** p = {pv_homo:.4e}")
 
     output.append("\n#### Suite B: Mitosis Efficiency (Execution Time in ms)")
     output.append("| Shards | Average Time (ms) ±σ | Status |")

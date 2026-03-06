@@ -1,5 +1,5 @@
 # MANIFOLD BENCHMARK REPORT
-Date: 2026-03-06 13:51:17
+Date: 2026-03-06 18:36:49
 
 ### SUMMARY OF STATISTICAL REFINEMENTS
 1. **Trimmed Means**: 10% trim applied to suppress outliers.
@@ -10,37 +10,38 @@ Date: 2026-03-06 13:51:17
 #### Suite A: Routing Analysis
 | Algorithm | Heterogeneous (±σ) | Homogeneous (±σ) |
 | :--- | :--- | :--- |
-| Manifold (L3) | 1.2102 (±1.1840, Skew:1.16) | 0.0646 (±0.0514, Skew:-0.05) |
-| P2C (Sampling) | 319.2458 (±82.7604, Skew:0.53) | 0.1492 (±0.0832, Skew:1.80) |
-| Round Robin | 19393.2192 (±2327.1677, Skew:-0.34) | 15.6411 (±13.4620, Skew:0.89) |
+| Manifold (L3) | 3.1074 (±1.5433, Skew:0.59) | 0.0655 (±0.0526, Skew:0.57) |
+| P2C (Sampling) | 292.2390 (±85.0294, Skew:-0.18) | 0.1436 (±0.0828, Skew:-0.25) |
+| Round Robin | 75.0889 (±30.3865, Skew:0.67) | 15.4841 (±9.8758, Skew:0.27) |
 
-**Robust P-Value (Yuen-Welch):** p = 2.5710e-05
+**Robust P-Value (Heterogeneous):** p = 5.7021e-05
+**Robust P-Value (Homogeneous):** p = 6.7296e-02
 
 #### Suite B: Mitosis Efficiency (Execution Time in ms)
 | Shards | Average Time (ms) ±σ | Status |
 | :--- | :--- | :--- |
-| 1 | 521.93 (±0.71) | OK |
-| 2 | 516.74 (±1.39) | OK |
-| 4 | 525.46 (±2.30) | OK |
-| 8 | 541.35 (±4.28) | OK |
-| 16 | 566.93 (±5.15) | OK |
+| 1 | 521.59 (±1.19) | OK |
+| 2 | 517.16 (±1.15) | OK |
+| 4 | 525.63 (±1.92) | OK |
+| 8 | 542.11 (±4.03) | OK |
+| 16 | 563.29 (±4.51) | OK |
 
 #### Suite C: Consensus Quorum Scaling (Latency in ms)
 | Nodes | Avg Commit Latency (ms) ±σ |
 | :--- | :--- |
-| 1 | 0.4314 (±0.0617) |
-| 3 | 0.7915 (±0.0508) |
-| 5 | 0.8868 (±0.1483) |
+| 1 | 0.4132 (±0.0661) |
+| 3 | 0.8425 (±0.0645) |
+| 5 | 0.9478 (±0.1537) |
 
 #### Suite D: Data Plane Justification (Execution Time)
 | Workload | Elixir VM (±σ) | Rust NIF (±σ) | Speedup |
 | :--- | :--- | :--- | :--- |
-| Micro (10 ops) | 94.00 ns (±0.00ms) | 490.98 ns (±0.00ms) | 0.19x |
-| Med (10k ops) | 125.22 μs (±0.00ms) | 216.33 μs (±0.01ms) | 0.58x |
-| Heavy (1M ops) | 18.47 ms (±0.18ms) | 21.91 ms (±0.64ms) | 0.84x |
+| Micro (10 ops) | 95.30 ns (±0.00ms) | 489.44 ns (±0.00ms) | 0.19x |
+| Med (10k ops) | 126.31 μs (±0.00ms) | 209.61 μs (±0.00ms) | 0.60x |
+| Heavy (1M ops) | 18.53 ms (±0.15ms) | 21.28 ms (±0.17ms) | 0.87x |
 
 #### Suite E: Tail Latency (5000 Tasks)
 | Algorithm | Availability | p50 (±CI) | p99 (±CI) | Raw Skew |
 | :--- | :--- | :--- | :--- | :--- |
-| Manifold | 100.0% | 2.14 (±0.39) | 81.84 (±16.00) | -0.43 |
-| P2c | 50.0% | 15005.11 (±14774.59) | **TIMEOUT** | nan |
+| Manifold | 100.0% | 2.00 (±0.02) | 87.64 (±11.39) | 0.49 |
+| P2c | 30.0% | 22512.69 (±13529.36) | **TIMEOUT** | nan |
