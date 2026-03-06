@@ -4,76 +4,83 @@ Manifold is a research framework for distributed task scheduling using **Minkows
 
 ## Core Pillars
 
-1.  **Minkowski Routing:** Implements an $L_3$ metric ($(|C_1-C_2|^3 + |M_1-M_2|^3)^{1/3}$) with exponential load distortion. This penalizes single-dimension resource outliers more heavily than Euclidean ($L_2$) distance.
-2.  **Task Mitosis:** A pipeline comprising **Static Instruction Analysis** (calculating deterministic effort scores in Rust) and **Proportional Heterogeneous Sharding** (allocating work-ranges sized relative to candidate node capacities).
-3.  **Hybrid Architecture:** A **Control Plane** (Elixir/OTP) for fault-tolerant orchestration and an **Accelerated Data Plane** (Rust/NIF) for native mathematical execution.
-4.  **Epidemic Gossip:** A batch-based directory propagation protocol ensuring cluster-wide state convergence through recursive neighbor synchronization.
+1.  **Minkowski Routing:** Implements an $L_3$ metric with exponential load distortion to penalize resource outliers.
+2.  **Task Mitosis:** Proportional heterogeneous sharding based on static instruction analysis.
+3.  **Hybrid Architecture:** Control Plane (Elixir/OTP) and Accelerated Data Plane (Rust/NIF).
+4.  **Epidemic Gossip:** O(log N) state convergence via recursive neighbor synchronization.
 
 ---
 
-## Performance Metrics (Benchmarks)
+## Performance Metrics
 
-*Generated on a simulated 5-node cluster (Apple M4 Environment).*
+*Results processed using Yuen-Welch tests and Winsorized variance for robust estimation.*
 
 ### **Suite A: Routing Variance**
-Measures how evenly the load-to-capacity ratio is distributed across nodes. Lower variance indicates more stable balancing.
+| Algorithm         | Heterogeneous (±Winsorized σ) | Homogeneous (±Winsorized σ) |
+| :---------------- | :---------------------------- | :-------------------------- |
+| **Manifold (L3)** | **1.2102 (±1.18)**            | **0.0646 (±0.05)**          |
+| P2C (Sampling)    | 319.2458 (±82.76)             | 0.1492 (±0.08)              |
+| Round Robin       | 19393.2192 (±2327.17)         | 15.6411 (±13.46)            |
+*Robust P-Value (Manifold vs P2C): p = 2.57e-05*
 
-#### **Heterogeneous Cluster** (Diverse capacities: 1.0 to 20.0)
-| Algorithm | Load Ratio Variance |
-| :--- | :--- |
-| **Manifold (L3)** | **0.4104** |
-| Power of Two Choices (P2C) | 143.0720 |
-| Round Robin | 17075.6904 |
-
-#### **Homogeneous Cluster** (All nodes equal: 10.0)
-| Algorithm | Load Ratio Variance |
-| :--- | :--- |
-| **Manifold (L3)** | **0.1080** |
-| Power of Two Choices (P2C) | 0.2400 |
-| Round Robin | 9.0720 |
-
-### **Suite B: Mitosis Efficiency (The U-Curve)**
-Coordination overhead of task splitting across loopback TCP sockets (100k ops).
-| Shards | Total Time (ms) |
-| :--- | :--- |
-| 1 (Local) | 522.24 ms |
-| 2 (Predicted Optimal) | 517.05 ms |
-| 4 | 530.03 ms |
-| 8 | 546.30 ms |
-| 16 | 573.03 ms |
-
-### **Suite C: Consensus Latency**
-Raft commit scaling for Distributed Shared Memory (DSM).
-| Nodes | Avg Commit Latency (ms) |
-| :--- | :--- |
-| 1 | 0.48 ms |
-| 3 | 0.94 ms |
-| 5 | 0.86 ms |
-
-### **Suite D: Virtual Machine Performance (1M Ops)**
-| Metric | Elixir (Control Plane) | Rust (Data Plane) |
-| :--- | :--- | :--- |
-| **Execution Rate** | 51.44 ips | **46.04 ips** |
-| **BEAM Heap Pressure** | **79.99 MB** | **0.000016 MB** |
-*Note: While small-scale throughput is similar due to NIF overhead, Rust eliminates BEAM heap pressure by a factor of 5,000,000x.*
+### **Suite E: Tail Latency (5000 Tasks)**
+| Metric           | Manifold (L3)         | P2C (Sampling)            |
+| :--------------- | :-------------------- | :------------------------ |
+| **Availability** | **100.0%**            | 50.0% (Systemic Collapse) |
+| **p50 (Median)** | **2.14 ms (±0.39)**   | 15005.11 ms (±14774.59)   |
+| **p99 (Tail)**   | **81.84 ms (±16.00)** | **TIMEOUT**               |
+| **Raw Skewness** | **-0.43**             | N/A                       |
 
 ---
 
-## Research Caveats & Analysis Notes
+## Usage Guide
 
-When analyzing the provided data, the following physical and logical constraints must be considered:
+### **1. Elixir/Rust Core (Production Prototype)**
+The primary research implementation using Elixir for the control plane and Rust for the data plane.
 
-1.  **Single-Machine Bottleneck:** All benchmarks run on a single physical CPU. In Suite B, high shard counts (8+) introduce **CPU contention** and OS context-switching overhead that would not exist in a truly distributed network.
-2.  **Loopback Latency:** Networking metrics use the `127.0.0.1` interface. Real-world physical network latency and switch-jitter will significantly increase the coordination cost in Suite C (Consensus).
-3.  **Memory Transparency:** The "Heap Pressure" advantage in Suite D reflects only the memory managed by the Erlang Garbage Collector (GC). Rust NIF execution uses **Manual Memory Management** on the native heap, which is opaque to BEAM GC but remains part of the total system footprint.
-4.  **Metric Sensitivity:** The $L_3$ metric is mathematically tuned to prioritize "Capacity Leveling." In clusters with near-zero load, the geometric distance may appear more volatile than P2C until the exponential distortion field triggers at higher load ratios.
-
----
-
-## Usage
-
-### **Run Benchmarks & Analysis**
-The following command executes all research suites and generates standardized CSV outputs for further analysis.
+#### **Run Benchmarks & Analysis**
 ```bash
+# Fetch dependencies and compile
+mix deps.get
+mix compile
+
+# Run all benchmark suites
 mix run benchmark.exs
+
+# Run benchmarks 10 times automatically and save it into labeled csv
+uv run repro/run_benchmarks.py
+
+# Generate robust statistical report and charts
+uv run repro/analyze_results.py
 ```
+
+### **2. Python Proof-of-Concept (POC)**
+A standalone, pure-Python implementation located in `poc_python/`. It demonstrates geometric routing and task mitosis using standard libraries.
+
+#### **Running the POC Cluster**
+```bash
+# 1. Launch the cluster (starts NODE_COUNT processes)
+uv run poc_python/launcher.py
+
+# 2. In a separate terminal, submit a workload
+uv run poc_python/client.py
+```
+*Note: The POC uses Node 9001 as a bootstrap seed. It simulates a 16-node cluster by default.*
+
+---
+
+## Statistical Rigor & Research Caveats
+
+The Manifold evaluation pipeline utilizes advanced robust statistics to ensure reproducibility:
+
+1.  **Trimming & Winsorization:** 10% trimming is applied to remove transient noise. Confidence Intervals are calculated using **Winsorized Variance** to prevent underestimation of standard error.
+2.  **Yuen-Welch Testing:** We reject standard t-tests in favor of Yuen's method for comparing trimmed means, providing valid p-values under non-normal latency distributions.
+3.  **Raw Skewness:** Unlike many benchmarks that report only means, we analyze raw skewness to expose the true extent of the latency tail before trimming.
+4.  **Single-Machine Bottleneck:** Note that all results are from a simulated environment on an Apple M4; real-world network jitter will increase absolute values but is expected to maintain relative delta.
+5.  **Loopback Latency:** Networking metrics use the `127.0.0.1` interface. Real-world physical network latency and switch-jitter will significantly increase the coordination cost in Suite C (Consensus).
+6.  **Memory Transparency:** The "Heap Pressure" advantage in Suite D reflects only the memory managed by the Erlang Garbage Collector (GC). Rust NIF execution uses **Manual Memory Management** on the native heap, which is opaque to BEAM GC but remains part of the total system footprint.
+7.  **Metric Sensitivity:** The $L_3$ metric is mathematically tuned to prioritize "Capacity Leveling." In clusters with near-zero load, the geometric distance may appear more volatile than P2C until the exponential distortion field triggers at higher load ratios.
+
+
+---
+*Created for the purpose of exploring geometric routing in heterogeneous computing environments.*
