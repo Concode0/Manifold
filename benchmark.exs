@@ -53,6 +53,207 @@ defmodule ManifoldEngine.Benchmark.ElixirVM do
   defp pop2([]), do: {0.0, 0.0, []}
 end
 
+defmodule ManifoldEngine.Benchmark.TailLatency do
+  @moduledoc """
+  Rigorous Tail Latency Benchmark for the Manifold Distributed OS.
+
+  This suite evaluates end-to-end task completion times under concurrent load,
+  comparing Manifold's Field-Based Gradient Routing (L3) against the
+  Power of Two Choices (P2C) algorithm.
+  """
+
+  alias ManifoldEngine.{Router, Node, Application, Task}
+
+  @doc """
+  Runs the tail latency benchmark.
+  - num_tasks: Total number of tasks to measure (default 1000).
+  - target_qps: Injected load in Queries Per Second (default 500).
+  """
+  def run(num_tasks \\ 1000, target_qps \\ 500) do
+    ports = [25001, 20002, 20003, 20004, 20005]
+    start_cluster(ports)
+
+    # Phase 1: Warm-up
+    # Ensures BEAM JIT compilation and Gossip convergence before measurement.
+    IO.puts("\n--- [Phase 1: Warming up BEAM VM & Gossip Network] ---")
+    Process.sleep(2000)
+    warmup(ports, 200)
+
+    # Phase 2: Main Benchmark
+    IO.puts("\n--- [Phase 2: Academic Tail Latency Run] ---")
+    IO.puts("Target QPS: #{target_qps} | Sample Size: #{num_tasks} tasks\n")
+
+    manifold_stats = measure_latencies(:manifold, ports, num_tasks, target_qps, 30000)
+    Process.sleep(3000) # Cooldown period for algorithmic isolation
+
+    p2c_stats = measure_latencies(:p2c, ports, num_tasks, target_qps, 30000)
+
+    # Final Report
+    IO.puts("\n=== [Final Tail Latency Report (ms)] ===")
+    IO.puts("ALGO     |  p10      |  p25      |  p50      |  p75      |  p90      |  p95      |  p99      | p99.9     |  Max")
+    IO.puts("------------------------------------------------------------------------------------------------------------------")
+    print_row("Manifold", manifold_stats)
+    print_row("P2C", p2c_stats)
+
+    stop_cluster(ports)
+    %{manifold: manifold_stats, p2c: p2c_stats}
+  end
+
+  # Open-loop load generator with Poisson-like arrivals
+  defp measure_latencies(algo, ports, num_tasks, qps, timeout_ms) do
+    callback_port = 25006
+    {:ok, l} = :gen_tcp.listen(callback_port, [:binary, packet: 4, active: false, reuseaddr: true])
+
+    parent = self()
+    # Async result collector to handle out-of-order returns
+    collector = spawn(fn -> collector_loop(num_tasks, %{}, parent) end)
+    spawn(fn -> accept_loop(l, collector) end)
+
+    program = [{:loop, 1000, 1}, {:push, 1.0}]
+    interval_ms = 1000 / qps
+
+    # Dispatch loop
+    task_starts = Enum.map(1..num_tasks, fn i ->
+      entry_port = Enum.random(ports)
+      task_id = "t_#{algo}_#{i}"
+
+      target_port = select_target(algo, entry_port, ports)
+
+      task = %Task{
+        id: task_id,
+        program: program,
+        start: 0.0,
+        end: 1.0,
+        req: [1.0, 1.0],
+        return_addr: {"127.0.0.1", callback_port}
+      }
+
+      start_ts = System.monotonic_time(:microsecond)
+      send_via_tcp(target_port, task)
+
+      # Throttle dispatch rate to target QPS
+      if rem(i, 10) == 0, do: Process.sleep(round(interval_ms * 10))
+
+      {task_id, start_ts}
+    end) |> Map.new()
+
+    IO.puts("[#{algo}] Dispatch complete. Collecting samples...")
+
+    # Wait for collector to finish or timeout
+    receive do
+      {:results, completion_times} ->
+        latencies = Enum.map(task_starts, fn {id, start_ts} ->
+          case Map.get(completion_times, id) do
+            nil -> timeout_ms * 1.0
+            end_ts -> (end_ts - start_ts) / 1000.0
+          end
+        end)
+        :gen_tcp.close(l)
+        calculate_stats(latencies)
+    after timeout_ms + 5000 ->
+      :gen_tcp.close(l)
+      calculate_stats([timeout_ms * 1.0])
+    end
+  end
+
+  defp select_target(:manifold, entry_port, _ports) do
+    case Router.best_candidates([1.0, 1.0], entry_port, 1) do
+      [{peer, _} | _] -> peer.id
+      _ -> entry_port
+    end
+  end
+
+  defp select_target(:p2c, _entry_port, ports) do
+    [p1, p2] = Enum.take_random(ports, 2)
+    s1 = Node.get_state(p1)
+    s2 = Node.get_state(p2)
+    if (s1.current_load + s1.ledger_pressure) <= (s2.current_load + s2.ledger_pressure), do: p1, else: p2
+  end
+
+  defp collector_loop(0, times, parent), do: send(parent, {:results, times})
+  defp collector_loop(remaining, times, parent) do
+    receive do
+      {:done, id, ts} -> collector_loop(remaining - 1, Map.put(times, id, ts), parent)
+    after 15000 -> send(parent, {:results, times})
+    end
+  end
+
+  defp accept_loop(l, collector) do
+    case :gen_tcp.accept(l) do
+      {:ok, s} ->
+        spawn(fn ->
+          case :gen_tcp.recv(s, 0, 5000) do
+            {:ok, data} ->
+              ts = System.monotonic_time(:microsecond)
+              case :erlang.binary_to_term(data) do
+                %{type: "result", payload: %{task_id: id}} -> send(collector, {:done, id, ts})
+                _ -> :ok
+              end
+            _ -> :ok
+          end
+          :gen_tcp.close(s)
+        end)
+        accept_loop(l, collector)
+      _ -> :ok
+    end
+  end
+
+  defp warmup(ports, num_tasks) do
+    Enum.each(1..num_tasks, fn i ->
+      port = Enum.random(ports)
+      task = %Task{id: "w_#{i}", program: [{:push, 1.0}], req: [1.0, 1.0]}
+      send_via_tcp(port, task)
+    end)
+    Process.sleep(1000)
+  end
+
+  defp calculate_stats(latencies) do
+    sorted = Enum.sort(latencies)
+    count = length(sorted)
+
+    %{
+      p10: Enum.at(sorted, round(count * 0.10) - 1) || 0.0,
+      p25: Enum.at(sorted, round(count * 0.25) - 1) || 0.0,
+      p50: Enum.at(sorted, round(count * 0.50) - 1) || 0.0,
+      p75: Enum.at(sorted, round(count * 0.75) - 1) || 0.0,
+      p90: Enum.at(sorted, round(count * 0.90) - 1) || 0.0,
+      p95: Enum.at(sorted, round(count * 0.95) - 1) || 0.0,
+      p99: Enum.at(sorted, round(count * 0.99) - 1) || 0.0,
+      p99_9: Enum.at(sorted, round(count * 0.999) - 1) || 0.0,
+      max: List.last(sorted) || 0.0
+    }
+  end
+
+  defp print_row(name, stats) do
+    :io.format("~-8s | ~8.2f | ~8.2f | ~8.2f | ~8.2f | ~8.2f | ~8.2f | ~8.2f | ~8.2f | ~8.2f~n",
+      [name, stats.p10, stats.p25, stats.p50, stats.p75, stats.p90, stats.p95, stats.p99, stats.p99_9, stats.max])
+  end
+
+  defp send_via_tcp(port, task) do
+    spawn(fn ->
+      case :gen_tcp.connect(~c"127.0.0.1", port, [:binary, packet: 4, active: false], 1000) do
+        {:ok, s} ->
+          :gen_tcp.send(s, :erlang.term_to_binary(%{type: "task", payload: task}))
+          :gen_tcp.close(s)
+        _ -> :error
+      end
+    end)
+  end
+
+  defp start_cluster(ports) do
+    Enum.each(ports, fn port -> ManifoldEngine.Application.start_node(port, 10.0, 10.0) end)
+  end
+
+  defp stop_cluster(ports) do
+    Enum.each(ports, fn port ->
+      Enum.each([ManifoldEngine.Node, ManifoldEngine.Networking, ManifoldEngine.Gossip, ManifoldEngine.Topology], fn mod ->
+        name = mod.name(port)
+        if pid = GenServer.whereis(name), do: Process.exit(pid, :kill)
+      end)
+    end)
+  end
+end
+
 defmodule ManifoldEngine.Benchmark.ClusterHelper do
   alias ManifoldEngine.Application
 
@@ -262,6 +463,26 @@ defmodule ManifoldEngine.Benchmark do
     Benchee.run(%{"Elixir VM" => fn prog -> ElixirVM.execute_task(prog, 0.0, 1.0) end, "Rust NIF"  => fn prog -> Native.execute_task(prog, 0.0, 1.0) end}, inputs: workloads, time: 2, memory_time: 1, formatters: [Benchee.Formatters.Console, {Benchee.Formatters.CSV, file: "benchmark_suite_d.csv"}])
   end
 
+  def run_suite_e do
+    IO.puts "\n--- [SUITE E: TAIL LATENCY & CASCADING FAILURE] ---"
+    IO.puts "\n[1000 Tasks Sustained Load]"
+    stats_1000 = ManifoldEngine.Benchmark.TailLatency.run(1000, 500)
+
+    IO.puts "\n[5000 Tasks Sustained Load (Cascading Failure Test)]"
+    stats_5000 = ManifoldEngine.Benchmark.TailLatency.run(5000, 500)
+
+    save_tail_csv("benchmark_suite_e_1000.csv", stats_1000)
+    save_tail_csv("benchmark_suite_e_5000.csv", stats_5000)
+  end
+
+  defp save_tail_csv(filename, stats) do
+    headers = "algo,p10,p25,p50,p75,p90,p95,p99,p99_9,max\n"
+    rows = Enum.map([manifold: stats.manifold, p2c: stats.p2c], fn {algo, s} ->
+      "#{algo},#{s.p10},#{s.p25},#{s.p50},#{s.p75},#{s.p90},#{s.p95},#{s.p99},#{s.p99_9},#{s.max}"
+    end) |> Enum.join("\n")
+    File.write!(filename, headers <> rows)
+  end
+
   defp send_via_tcp(port, packet) do
     case :gen_tcp.connect(~c"127.0.0.1", port, [:binary, packet: 4, active: false], 1000) do
       {:ok, s} ->
@@ -282,3 +503,4 @@ ManifoldEngine.Benchmark.run_suite_a()
 ManifoldEngine.Benchmark.run_suite_b()
 ManifoldEngine.Benchmark.run_suite_c()
 ManifoldEngine.Benchmark.run_suite_d()
+ManifoldEngine.Benchmark.run_suite_e()
