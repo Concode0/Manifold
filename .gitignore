@@ -12,7 +12,6 @@ erl_crash.dump
 
 # Python
 __pycache__/
-*.py
 .venv/
 
 /nonode@nohost/
@@ -23,7 +22,5 @@ __pycache__/
 .vscode/
 .idea/
 Thumbs.db
-
-*.csv
 
 GEMINI.md
